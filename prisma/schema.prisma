@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ImportMethod {
+  extension
+  username
+}
+
+enum Difficulty {
+  Easy
+  Medium
+  Hard
+}
+
+enum TopicStatus {
+  strong
+  needs_work
+  weak
+}
+
+model User {
+  id               String          @id @default(cuid())
+  clerkId          String          @unique
+  email            String?
+  firstName        String?
+  leetcodeUsername String?
+  importMethod     ImportMethod?
+  lastSyncedAt     DateTime?
+  totalSolved      Int             @default(0)
+  easySolved       Int             @default(0)
+  mediumSolved     Int             @default(0)
+  hardSolved       Int             @default(0)
+  currentStreak    Int             @default(0)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  submissions      Submission[]
+  histories        ProblemHistory[]
+  topicScores      TopicScore[]
+  dailyPlans       DailyPlan[]
+  mentorMessages   MentorMessage[]
+}
+
+model Submission {
+  id            String   @id @default(cuid())
+  userId        String
+  submissionId  String
+  problemId     String?
+  title         String
+  slug          String
+  difficulty    String
+  topicTags     String[]
+  statusCode    Int?
+  status        String
+  statusDisplay String
+  runtime       String?
+  memory        String?
+  language      String?
+  timestamp     DateTime
+  submissionUrl String?
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, submissionId])
+  @@index([userId, timestamp])
+  @@index([userId, slug])
+}
+
+model ProblemHistory {
+  id               String   @id @default(cuid())
+  userId           String
+  problemId        String?
+  title            String
+  slug             String
+  difficulty       String
+  topicTags        String[]
+  attempts         Int
+  accepted         Boolean
+  firstAcceptedAt  DateTime?
+  lastAttemptedAt  DateTime
+  firstAttemptRate Float    @default(0)
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slug])
+  @@index([userId, accepted])
+}
+
+model TopicScore {
+  id               String      @id @default(cuid())
+  userId           String
+  topic            String
+  solved           Int
+  avgAttempts      Float
+  firstAttemptRate Float
+  weaknessScore    Int
+  status           TopicStatus
+  updatedAt        DateTime    @updatedAt
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topic])
+}
+
+model DailyPlan {
+  id        String         @id @default(cuid())
+  userId    String
+  date      DateTime
+  createdAt DateTime       @default(now())
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problems  DailyProblem[]
+
+  @@unique([userId, date])
+}
+
+model DailyProblem {
+  id          String    @id @default(cuid())
+  dailyPlanId String
+  title       String
+  slug        String
+  topic       String
+  difficulty  String
+  reason      String
+  leetcodeUrl String
+  order       Int
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  dailyPlan   DailyPlan @relation(fields: [dailyPlanId], references: [id], onDelete: Cascade)
+}
+
+model ProblemCatalog {
+  id          String   @id @default(cuid())
+  problemId   String
+  title       String
+  slug        String   @unique
+  difficulty  String
+  topicTags   String[]
+  isPremium   Boolean  @default(false)
+  leetcodeUrl String
+  updatedAt   DateTime @updatedAt
+}
+
+model MentorMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
