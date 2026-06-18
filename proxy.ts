@@ -18,9 +18,12 @@ const protectedProxy = clerkMiddleware((auth, req) => {
   return NextResponse.next()
 })
 
-export default function proxy(req: Parameters<typeof protectedProxy>[0]) {
-  if (!clerkEnabled()) return NextResponse.next()
-  return protectedProxy(req)
+export default function proxy(...args: Parameters<typeof protectedProxy>) {
+  if (!clerkEnabled()) {
+    return NextResponse.next()
+  }
+
+  return protectedProxy(...args)
 }
 
 export const config = {
