@@ -15,11 +15,10 @@ export async function syncFromExtension(userId: string, jsonData: ExtensionExpor
   })
 
   const normalized = normalizeExtensionExport(jsonData)
-  const newOnly = user.lastSyncedAt
-    ? normalized.filter((submission) => submission.timestamp > user.lastSyncedAt!)
-    : normalized
 
-  return runImportPipeline(userId, newOnly)
+  // Always process the complete export. The pipeline deduplicates by submission ID,
+  // while a timestamp cutoff would prevent older history from being backfilled.
+  return runImportPipeline(userId, normalized)
 }
 
 export async function syncFromUsername(userId: string) {

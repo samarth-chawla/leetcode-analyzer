@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { prisma } from '@/lib/prisma'
+import { performanceScore } from '@/lib/analytics/score'
 
 export async function askMentor(userId: string, question: string) {
   const [topics, plan, stats] = await Promise.all([
@@ -11,7 +12,10 @@ export async function askMentor(userId: string, question: string) {
   const context = JSON.stringify({
     solved: stats?.totalSolved,
     streak: stats?.currentStreak,
-    weakTopics: topics,
+    weakTopics: topics.map(({ weaknessScore, ...topic }) => ({
+      ...topic,
+      score: performanceScore(weaknessScore)
+    })),
     todaysPlan: plan?.problems
   })
 

@@ -21,6 +21,11 @@ export type LeetCodeSolvedProfile = {
   longestStreak: number | null
   heatmap: { cells: Array<{ date: string; count: number }> } | null
 }
+export type LeetCodeTagProblemCount = {
+  tagName: string
+  tagSlug: string
+  problemsSolved: number
+}
 
 type Page = {
   submissions: GraphQLSubmission[]
@@ -117,6 +122,36 @@ export async function fetchQuestionMetadata(
   return payload.question ?? null
 }
 
+export async function fetchUserTagStats(username: string): Promise<LeetCodeTagProblemCount[]> {
+  const payload = await leetCodeGraphQL<{
+    matchedUser?: {
+      tagProblemCounts?: {
+        advanced?: LeetCodeTagProblemCount[]
+        intermediate?: LeetCodeTagProblemCount[]
+        fundamental?: LeetCodeTagProblemCount[]
+      }
+    } | null
+  }>(
+    `
+      query skillStats($username: String!) {
+        matchedUser(username: $username) {
+          tagProblemCounts {
+            advanced { tagName tagSlug problemsSolved }
+            intermediate { tagName tagSlug problemsSolved }
+            fundamental { tagName tagSlug problemsSolved }
+          }
+        }
+      }
+    `,
+    { username }
+  )
+
+  const counts = payload.matchedUser?.tagProblemCounts
+  if (!counts) return []
+
+  return [...(counts.advanced ?? []), ...(counts.intermediate ?? []), ...(counts.fundamental ?? [])]
+    .sort((a, b) => b.problemsSolved - a.problemsSolved || a.tagName.localeCompare(b.tagName))
+}
 export async function fetchUserSolvedProfile(username: string): Promise<LeetCodeSolvedProfile | null> {
   const payload = await leetCodeGraphQL<{
     matchedUser?: {
