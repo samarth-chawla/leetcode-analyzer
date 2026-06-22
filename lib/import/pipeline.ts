@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import { rebuildProblemHistory, rebuildTopicScores } from '@/lib/analytics/rebuild'
 import { updatePlanCompletion } from '@/lib/plan/completion-tracker'
-import { ensureDailyPlan } from '@/lib/plan/recommend'
+import { refreshTodayDailyPlan } from '@/lib/plan/recommend'
 import type { ImportResult, NormalizedSubmission } from './types'
+import { computeLeetCodeProfileUpsertForUser } from '@/lib/profile/compute-leetcode-profile-upsert'
 
 export async function runImportPipeline(
   userId: string,
@@ -11,51 +12,40 @@ export async function runImportPipeline(
   let imported = 0
   let skipped = 0
 
-  for (const submission of submissions) {
+  // Deduplicate using submissionId (insert-only semantics).
+  const incomingIds = Array.from(new Set(submissions.map((s) => s.submissionId)))
+
+  const existing = await prisma.submission.findMany({
+    where: { userId, submissionId: { in: incomingIds } },
+    select: { submissionId: true }
+  })
+  const existingIdSet = new Set(existing.map((e) => e.submissionId))
+
+  const newOnly = submissions.filter((s) => !existingIdSet.has(s.submissionId))
+  skipped += submissions.length - newOnly.length
+
+  for (const submission of newOnly) {
     try {
-      // Avoid crashing on duplicates (userId + submissionId is unique)
-      await prisma.submission.upsert({
-        where: {
-          userId_submissionId: {
-            userId,
-            submissionId: submission.submissionId
-          }
-        },
-        update: {
-          // Keep these fields in sync in case LeetCode returns updated metadata
-          problemId: submission.problemId,
-          title: submission.title,
-          slug: submission.slug,
-          difficulty: submission.difficulty,
-          topicTags: submission.topicTags,
-          statusCode: submission.statusCode,
-          status: submission.status,
-          statusDisplay: submission.statusDisplay,
-          runtime: submission.runtime,
-          memory: submission.memory,
-          language: submission.language,
-          timestamp: submission.timestamp,
-          submissionUrl: submission.submissionUrl
-        },
-        create: {
+      await prisma.submission.create({
+        data: {
           userId,
           ...submission
         }
       })
-
-      // We still treat “upsert happened” as imported; if you prefer exact
-      // counting of newly-created rows, we can refactor after adding a
-      // create-only path.
       imported += 1
     } catch {
+      // Covers rare races or duplicate IDs repeated within the same payload.
       skipped += 1
     }
   }
 
+  // Recompute everything from accepted submissions / derived analytics.
   await updatePlanCompletion(userId)
   await rebuildProblemHistory(userId)
   await rebuildTopicScores(userId)
-  await ensureDailyPlan(userId)
+  await computeLeetCodeProfileUpsertForUser(userId)
+  await refreshTodayDailyPlan(userId)
+
   await prisma.user.update({
     where: { id: userId },
     data: { lastSyncedAt: new Date() }
@@ -64,6 +54,6 @@ export async function runImportPipeline(
   return {
     imported,
     skipped,
-    message: `Imported ${imported} new submissions.`
+    message: `Imported ${imported} new submissions. Skipped ${skipped} duplicate or failed submissions.`
   }
 }

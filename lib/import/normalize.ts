@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { fetchQuestionMetadata } from '@/lib/leetcode/graphql'
 import type { ExtensionExport, NormalizedSubmission } from './types'
 
 type ExtensionSubmission = Record<string, unknown>
@@ -10,7 +11,7 @@ export function normalizeExtensionSubmission(raw: unknown): NormalizedSubmission
     problemId: s.problemId ? String(s.problemId) : null,
     title: String(s.title ?? 'Unknown Problem'),
     slug: String(s.slug ?? s.titleSlug ?? ''),
-    difficulty: String(s.difficulty ?? 'Medium'),
+    difficulty: String(s.difficulty ?? 'Unknown'),
     topicTags: Array.isArray(s.topicTags) ? s.topicTags.map(String) : [],
     statusCode: typeof s.statusCode === 'number' ? s.statusCode : null,
     status: String(s.status ?? s.statusDisplay ?? 'Unknown'),
@@ -40,24 +41,51 @@ export type GraphQLSubmission = {
   url?: string
 }
 
+async function getQuestionMetadata(titleSlug: string) {
+  const catalogProblem = await prisma.problemCatalog.findUnique({ where: { slug: titleSlug } })
+  if (catalogProblem) return catalogProblem
+
+  const metadata = await fetchQuestionMetadata(titleSlug)
+  if (!metadata) return null
+
+  return prisma.problemCatalog.upsert({
+    where: { slug: metadata.titleSlug },
+    create: {
+      problemId: metadata.questionId,
+      title: metadata.title,
+      slug: metadata.titleSlug,
+      difficulty: metadata.difficulty,
+      topicTags: metadata.topicTags.map((topic) => topic.name),
+      isPremium: metadata.isPaidOnly ?? false,
+      leetcodeUrl: `https://leetcode.com/problems/${metadata.titleSlug}/`
+    },
+    update: {
+      problemId: metadata.questionId,
+      title: metadata.title,
+      difficulty: metadata.difficulty,
+      topicTags: metadata.topicTags.map((topic) => topic.name),
+      isPremium: metadata.isPaidOnly ?? false,
+      leetcodeUrl: `https://leetcode.com/problems/${metadata.titleSlug}/`
+    }
+  })
+}
+
 export async function normalizeGraphQLSubmissionWithFallback(
   raw: GraphQLSubmission
 ): Promise<NormalizedSubmission> {
-  const difficulty = raw.question?.difficulty
-  const topicTags = raw.question?.topicTags?.map((t) => t.name) ?? []
-  
-  const needsCatalog = !difficulty || topicTags.length === 0
-  const catalogProblem = needsCatalog
-    ? await prisma.problemCatalog.findUnique({ where: { slug: raw.titleSlug } })
-    : null
+  const graphqlDifficulty = raw.question?.difficulty
+  const graphqlTopicTags = raw.question?.topicTags?.map((t) => t.name) ?? []
+
+  const needsMetadata = !raw.question?.questionId || !graphqlDifficulty || graphqlTopicTags.length === 0
+  const metadata = needsMetadata ? await getQuestionMetadata(raw.titleSlug) : null
 
   return {
     submissionId: raw.id,
-    problemId: raw.question?.questionId ?? catalogProblem?.problemId ?? null,
-    title: raw.title,
+    problemId: raw.question?.questionId ?? metadata?.problemId ?? null,
+    title: metadata?.title ?? raw.title,
     slug: raw.titleSlug,
-    difficulty: difficulty ?? catalogProblem?.difficulty ?? 'Medium',
-    topicTags: topicTags.length > 0 ? topicTags : catalogProblem?.topicTags ?? [],
+    difficulty: graphqlDifficulty ?? metadata?.difficulty ?? 'Unknown',
+    topicTags: graphqlTopicTags.length > 0 ? graphqlTopicTags : metadata?.topicTags ?? [],
     statusCode: null,
     status: raw.statusDisplay,
     statusDisplay: raw.statusDisplay,

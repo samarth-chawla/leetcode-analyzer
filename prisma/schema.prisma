@@ -44,7 +44,10 @@ model User {
   topicScores      TopicScore[]
   dailyPlans       DailyPlan[]
   mentorMessages   MentorMessage[]
+  leetCodeProfile  LeetCodeProfile?
+
 }
+
 
 model Submission {
   id            String   @id @default(cuid())
@@ -151,3 +154,34 @@ model MentorMessage {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+model LeetCodeProfile {
+  id                       String   @id @default(cuid())
+  userId                   String   @unique
+  username                 String
+
+  totalSolved              Int
+  easySolved               Int
+  mediumSolved             Int
+  hardSolved               Int
+
+  activeDaysCount          Int
+  currentStreak            Int
+  longestStreak           Int
+
+  submissionCount         Int
+  lastYearSubmissionCount Int
+
+  globalRank               Int?
+
+  // Heatmap data stored as JSON for flexibility.
+  // Expected shape depends on how we map LeetCode’s analytics response.
+  heatmap                  Json?
+
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+

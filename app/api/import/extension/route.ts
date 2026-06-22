@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
+import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { validateExtensionJSON } from '@/lib/import/validate-extension-json'
 import { normalizeExtensionExport } from '@/lib/import/normalize'
@@ -20,20 +21,19 @@ export async function POST(req: Request) {
     }
 
     const exportData = body as ExtensionExport
-    const normalized = normalizeExtensionExport(exportData)
-    const result = await runImportPipeline(dbUser.id, normalized)
-
     await prisma.user.update({
       where: { id: dbUser.id },
       data: {
         leetcodeUsername: exportData.user.username,
-        importMethod: 'extension',
-        totalSolved: exportData.user.totalSolved ?? dbUser.totalSolved,
-        easySolved: exportData.user.easySolved ?? dbUser.easySolved,
-        mediumSolved: exportData.user.mediumSolved ?? dbUser.mediumSolved,
-        hardSolved: exportData.user.hardSolved ?? dbUser.hardSolved
+        importMethod: 'extension'
       }
     })
+
+    const normalized = normalizeExtensionExport(exportData)
+    const result = await runImportPipeline(dbUser.id, normalized)
+
+    revalidatePath('/dashboard')
+    revalidatePath('/analytics')
 
     return Response.json(result)
   } catch (error) {

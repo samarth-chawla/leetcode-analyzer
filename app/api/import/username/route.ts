@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
+import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { syncFromUsername } from '@/lib/sync/sync'
 
@@ -21,6 +22,9 @@ export async function POST(req: Request) {
     })
 
     const result = await syncFromUsername(dbUser.id)
+    revalidatePath('/dashboard')
+    revalidatePath('/analytics')
+
     return Response.json(result)
   } catch (error) {
     console.error('Import error:', error)

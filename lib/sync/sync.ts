@@ -9,6 +9,11 @@ export async function syncFromExtension(userId: string, jsonData: ExtensionExpor
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) throw new Error('User not found')
 
+  await prisma.user.update({
+    where: { id: userId },
+    data: { leetcodeUsername: jsonData.user.username, importMethod: 'extension' }
+  })
+
   const normalized = normalizeExtensionExport(jsonData)
   const newOnly = user.lastSyncedAt
     ? normalized.filter((submission) => submission.timestamp > user.lastSyncedAt!)
@@ -21,6 +26,11 @@ export async function syncFromUsername(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user?.leetcodeUsername) throw new Error('No LeetCode username set')
 
+  await prisma.user.update({
+    where: { id: userId },
+    data: { importMethod: 'username' }
+  })
+
   console.log(`Syncing submissions for user ${user.leetcodeUsername}...`)
   console.log(`lastSyncedAt=${user.lastSyncedAt ? user.lastSyncedAt.toISOString() : 'null'}`)
 
@@ -30,11 +40,14 @@ export async function syncFromUsername(userId: string) {
   const rawSubmissions = await fetchSubmissionsSince(user.leetcodeUsername, cutoff)
   console.log(`Fetched(after cutoff filter) ${rawSubmissions.length} submissions`)
 
-  const normalized = await Promise.all(rawSubmissions.map(normalizeGraphQLSubmissionWithFallback))
+  const normalized = []
+  for (const submission of rawSubmissions) {
+    normalized.push(await normalizeGraphQLSubmissionWithFallback(submission))
+  }
   console.log(`Normalized ${normalized.length} submissions`)
 
   const result = await runImportPipeline(userId, normalized)
   console.log(`Import complete: ${result.imported} imported, ${result.skipped} skipped`)
-  
+
   return result
 }
