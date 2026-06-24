@@ -21,6 +21,7 @@ const PLAN_SIZE = 3
 const REVISIT_AFTER_DAYS = 60
 const REVISIT_MAX_SCORE = 65
 const AI_CANDIDATE_LIMIT = 12
+const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash'
 
 function selectDifficulty(score: number): Difficulty {
   if (score <= 25) return 'Easy'
@@ -152,7 +153,7 @@ async function pickImportantProblemWithAi(
 
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
     const candidatePayload = candidates.map((problem) => ({
       slug: problem.slug,
       title: problem.title,
