@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { Send } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Send, RotateCcw, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useRouter } from 'next/navigation'
 
 type MentorMessage = { role: string; content: string }
 
@@ -68,9 +69,18 @@ function FormattedMessage({ content }: { content: string }) {
 }
 
 export function MentorChat({ initial }: { initial: MentorMessage[] }) {
+  const router = useRouter()
   const [messages, setMessages] = useState(initial)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
+  const [resetting, setResetting] = useState(false)
+
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   function updateLastAssistant(chunk: string) {
     setMessages((current) => {
@@ -119,6 +129,7 @@ export function MentorChat({ initial }: { initial: MentorMessage[] }) {
 
       const remaining = decoder.decode()
       if (remaining) updateLastAssistant(remaining)
+      router.refresh()
     } catch {
       updateLastAssistant('The mentor could not connect right now. Please try again.')
     } finally {
@@ -126,8 +137,60 @@ export function MentorChat({ initial }: { initial: MentorMessage[] }) {
     }
   }
 
+  async function handleReset() {
+    if (!confirmReset) {
+      setConfirmReset(true)
+      setTimeout(() => setConfirmReset(false), 3000)
+      return
+    }
+
+    setResetting(true)
+    setConfirmReset(false)
+    try {
+      const response = await fetch('/api/mentor/reset', {
+        method: 'POST'
+      })
+      if (response.ok) {
+        setMessages([])
+        router.refresh()
+      }
+    } catch (err) {
+      console.error('Failed to reset chat history.', err)
+    } finally {
+      setResetting(false)
+    }
+  }
+
   return (
-    <div className="card flex min-h-[640px] flex-col">
+    <div className="card flex h-[calc(100vh-300px)] md:h-[calc(100vh-190px)] min-h-[460px] flex-col">
+      {/* Chat Header */}
+      <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+        <div>
+          <h2 className="text-sm font-semibold text-primary">Chat Session</h2>
+          <p className="hidden sm:block text-xs text-secondary">Your profile context is loaded and active</p>
+        </div>
+        {messages.length > 0 && (
+          <Button
+            variant="secondary"
+            onClick={handleReset}
+            disabled={busy || resetting}
+            className={`h-8 px-3 text-xs flex items-center gap-1.5 transition-all ${
+              confirmReset
+                ? 'border-danger bg-danger/10 text-danger hover:bg-danger/20 hover:text-danger'
+                : 'text-secondary hover:text-danger hover:border-danger/30'
+            }`}
+          >
+            {resetting ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <RotateCcw className="h-3 w-3" />
+            )}
+            {confirmReset ? 'Confirm' : 'Reset Chat'}
+          </Button>
+        )}
+      </div>
+
+      {/* Message List */}
       <div className="flex-1 space-y-3 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="rounded-xl border border-border bg-surface p-4 text-sm text-secondary">
@@ -137,7 +200,7 @@ export function MentorChat({ initial }: { initial: MentorMessage[] }) {
         {messages.map((item, index) => (
           <div
             key={`${item.role}-${index}`}
-            className={`max-w-[85%] rounded-xl p-3 text-sm leading-6 ${
+            className={`max-w-[90%] md:max-w-[85%] rounded-xl p-3 text-sm leading-6 ${
               item.role === 'user' ? 'ml-auto bg-brand text-white' : 'bg-surface text-primary'
             }`}
           >
@@ -148,6 +211,7 @@ export function MentorChat({ initial }: { initial: MentorMessage[] }) {
             )}
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
       <form onSubmit={submit} className="mt-4 flex gap-2">
         <Input value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Ask your AI mentor..." />

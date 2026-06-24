@@ -56,7 +56,7 @@ export default async function AnalyticsPage() {
     <AppShell active="/analytics">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-[32px] font-bold text-primary">Analytics</h1>
+          <h1 className="text-2xl md:text-[32px] font-bold text-primary">Analytics</h1>
           <p className="mt-2 text-sm text-secondary">
             Difficulty and topic totals come from your LeetCode profile. Attempt analytics use recent username imports.
           </p>
@@ -65,12 +65,12 @@ export default async function AnalyticsPage() {
       </div>
 
       <section className="card mt-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-primary">Topic Performance</h2>
             <p className="mt-1 text-sm text-secondary">A solved problem is counted once in each of its LeetCode tags.</p>
           </div>
-          <Badge tone={officialTags.length > 0 ? 'success' : 'warning'}>
+          <Badge tone={officialTags.length > 0 ? 'success' : 'warning'} className="w-fit self-start sm:self-auto">
             {officialTags.length > 0
               ? officialTags.length + ' official LeetCode topic counts'
               : taggedSolved + '/' + officialTotal + ' solved problems have imported tags'}

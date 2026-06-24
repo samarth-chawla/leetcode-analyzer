@@ -11,7 +11,7 @@ export async function POST() {
     const dbUser = await prisma.user.findUnique({ where: { clerkId: userId } })
     if (!dbUser) return Response.json({ error: 'User not found' }, { status: 404 })
 
-    const plan = await refreshTodayDailyPlan(dbUser.id)
+    const plan = await refreshTodayDailyPlan(dbUser.id, true)
 
     revalidatePath('/dashboard')
 

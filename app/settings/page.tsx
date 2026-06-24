@@ -3,6 +3,7 @@ import { Database, GitBranch, RotateCw, UserRound } from 'lucide-react'
 import { AppShell, ensureImported } from '@/components/app-shell'
 import { Badge } from '@/components/ui/badge'
 import { ResetSyncButton } from '@/components/reset-sync-button'
+import { ChangeUsernameForm } from '@/components/change-username-form'
 import packageJson from '@/package.json'
 
 function formatDate(date: Date | null) {
@@ -11,7 +12,7 @@ function formatDate(date: Date | null) {
 
 function methodLabel(method: string | null) {
   if (method === 'username') return 'Username sync'
-  if (method === 'extension') return 'Extension export'
+  if (method === 'extension') return 'Extension export (Will be launching soon)'
   return 'Pending'
 }
 
@@ -54,6 +55,8 @@ export default async function SettingsPage() {
             <StatRow label="Last import method" value={<Badge>{methodLabel(user.importMethod)}</Badge>} />
             <StatRow label="Last synced" value={formatDate(user.lastSyncedAt)} />
           </div>
+
+          <ChangeUsernameForm currentUsername={user.leetcodeUsername} />
         </section>
 
         <section className="card">

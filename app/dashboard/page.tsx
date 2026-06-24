@@ -1,11 +1,11 @@
 import { differenceInHours, format, startOfDay } from 'date-fns'
 import Link from 'next/link'
-import { CheckCircle2, ExternalLink } from 'lucide-react'
 import { AppShell, ensureImported } from '@/components/app-shell'
 import { Badge } from '@/components/ui/badge'
 import { SyncButton } from '@/components/sync-button'
 import { DashboardProfileOverview } from '@/components/dashboard-profile-overview'
 import { ChangePlanButton } from '@/components/change-plan-button'
+import { DashboardProblemsList } from '@/components/dashboard-problems-list'
 import { prisma } from '@/lib/prisma'
 import { ensureDailyPlan } from '@/lib/plan/recommend'
 import { syncFromUsername } from '@/lib/sync/sync'
@@ -101,7 +101,7 @@ export default async function DashboardPage() {
             Good morning, {user.firstName ?? 'John'}
           </h1>
           <p className="mt-2 text-sm text-secondary">
-            Current streak:{' '}
+            Max streak:{' '}
             <span className="font-semibold text-primary">{profile.currentStreak} days</span>
             <span className="mx-3">|</span>
             Latest accepted:{' '}
@@ -126,40 +126,7 @@ export default async function DashboardPage() {
             <ChangePlanButton />
           </div>
         </div>
-        <div className="divide-y divide-border">
-          {plan.problems.map((problem) => (
-            <div key={problem.id} className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
-              <div className={problem.completed ? 'opacity-60' : ''}>
-                <div className="flex items-center gap-3">
-                  {problem.completed ? (
-                    <CheckCircle2 className="h-5 w-5 text-success" />
-                  ) : (
-                    <span className="font-mono text-sm text-secondary">{problem.order}</span>
-                  )}
-                  <h3 className={`text-lg font-semibold text-primary ${problem.completed ? 'line-through' : ''}`}>
-                    {problem.title}
-                  </h3>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {problem.reason.startsWith('Revisit:') ? <Badge tone="brand">Revisit</Badge> : null}
-                  <Badge tone="neutral">{problem.topic}</Badge>
-                  <Badge tone={problem.difficulty === 'Easy' ? 'success' : problem.difficulty === 'Hard' ? 'danger' : 'warning'}>
-                    {problem.difficulty}
-                  </Badge>
-                </div>
-                <p className="mt-2 text-sm text-secondary">{problem.reason}</p>
-              </div>
-              <a
-                href={problem.leetcodeUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-10 items-center justify-center rounded-lg bg-brand px-4 text-sm font-medium text-white"
-              >
-                Start <ExternalLink className="ml-2 h-4 w-4" />
-              </a>
-            </div>
-          ))}
-        </div>
+        <DashboardProblemsList initialProblems={plan.problems} />
       </section>
 
       <section className="mt-6">
@@ -182,21 +149,6 @@ export default async function DashboardPage() {
           ))}
           {weakTopics.length === 0 ? <p className="text-sm text-secondary">No topic analytics yet.</p> : null}
         </div>
-      </section>
-
-      <section className="mt-6 grid gap-3 md:grid-cols-4">
-        {[
-          ['Total Solved', profile.totalSolved],
-          ['Easy', profile.easySolved],
-          ['Medium', profile.mediumSolved],
-          ['Hard', profile.hardSolved]
-        ].map(([label, value]) => (
-          <div key={label} className="card">
-            <p className="text-sm text-secondary">{label}</p>
-            <p className="mt-2 font-mono text-3xl font-semibold text-primary">{value}</p>
-            <p className="mt-1 text-sm text-secondary">Solved</p>
-          </div>
-        ))}
       </section>
 
       <section className="card mt-6">

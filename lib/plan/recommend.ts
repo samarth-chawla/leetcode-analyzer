@@ -386,7 +386,7 @@ export async function ensureDailyPlan(userId: string) {
   })
 }
 
-export async function refreshTodayDailyPlan(userId: string) {
+export async function refreshTodayDailyPlan(userId: string, forceDifferent: boolean = false) {
   const today = startOfDay(new Date())
   const existing = await prisma.dailyPlan.findUnique({
     where: { userId_date: { userId, date: today } },
@@ -401,6 +401,10 @@ export async function refreshTodayDailyPlan(userId: string) {
     (order) => !completedOrders.has(order)
   )
 
+  const uncompletedSlugs = existing.problems
+    .filter((problem) => !problem.completed)
+    .map((problem) => problem.slug)
+
   await prisma.dailyProblem.deleteMany({
     where: { dailyPlanId: existing.id, completed: false }
   })
@@ -411,6 +415,12 @@ export async function refreshTodayDailyPlan(userId: string) {
     recentSlugs.add(problem.slug)
   }
 
+  if (forceDifferent) {
+    for (const slug of uncompletedSlugs) {
+      recentSlugs.add(slug)
+    }
+  }
+
   await fillPlanSlots(userId, existing.id, today, topics, solved, recentSlugs, openOrders)
 
   return prisma.dailyPlan.findUniqueOrThrow({
@@ -418,3 +428,4 @@ export async function refreshTodayDailyPlan(userId: string) {
     include: { problems: { orderBy: { order: 'asc' } } }
   })
 }
+

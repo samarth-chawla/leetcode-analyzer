@@ -6,10 +6,10 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 const LEETCODE_TOTALS = {
-  all: 3962,
-  Easy: 950,
-  Medium: 2069,
-  Hard: 943
+  all: 3972,
+  Easy: 951,
+  Medium: 2074,
+  Hard: 947
 }
 
 type Difficulty = 'Easy' | 'Medium' | 'Hard'
@@ -112,31 +112,51 @@ function SubmissionHeatmap({ cells, today }: { cells: DashboardHeatmapCell[]; to
   const days = Array.from({ length: 364 }, (_, index) => subDays(todayDate, 363 - index))
   const weeks = Array.from({ length: Math.ceil(days.length / 7) }, (_, index) => days.slice(index * 7, index * 7 + 7))
 
+  // Pre-calculate month labels
+  const monthLabels = weeks.map((week, index) => {
+    const firstDay = week[0]
+    const previousWeek = weeks[index - 1]
+    const startsMonth = index === 0 || firstDay.getMonth() !== previousWeek?.[0]?.getMonth()
+    return startsMonth ? format(firstDay, 'MMM') : ''
+  })
+
+  // Suppress overlapping adjacent month labels (within 3 weeks of each other)
+  for (let i = 0; i < monthLabels.length; i++) {
+    if (monthLabels[i]) {
+      for (let j = i + 1; j < monthLabels.length; j++) {
+        if (monthLabels[j]) {
+          if (j - i < 3) {
+            monthLabels[i] = ''
+          }
+          break
+        }
+      }
+    }
+  }
+
   return (
-    <div>
-      <div className="overflow-x-auto pb-1">
-        <div className="inline-flex min-w-full gap-1 pr-2">
+    <div className="flex flex-col w-full">
+      <div className="w-full overflow-x-auto pb-1 flex md:justify-center">
+        <div className="inline-flex gap-1 px-2">
           {weeks.map((week, weekIndex) => {
             const firstDay = week[0]
-            const previousWeek = weeks[weekIndex - 1]
-            const startsMonth = weekIndex === 0 || firstDay.getMonth() !== previousWeek?.[0]?.getMonth()
-            const monthLabel = startsMonth ? format(firstDay, 'MMM') : ''
+            const monthLabel = monthLabels[weekIndex]
 
             return (
-              <div key={format(firstDay, 'yyyy-MM-dd')} className={cn('relative grid grid-rows-7 gap-1 pt-5', startsMonth && weekIndex > 0 && 'ml-2 border-l border-border pl-2')}>
-                {monthLabel ? <span className="absolute left-2 top-0 text-[11px] text-secondary">{monthLabel}</span> : null}
+              <div key={format(firstDay, 'yyyy-MM-dd')} className="relative grid grid-rows-7 gap-1 pt-6">
+                {monthLabel ? <span className="absolute left-0 top-0 text-[10px] text-secondary font-medium">{monthLabel}</span> : null}
                 {week.map((day) => {
                   const key = format(day, 'yyyy-MM-dd')
                   const count = byDate.get(key) ?? 0
                   const tone = count >= 4 ? 'bg-success' : count >= 2 ? 'bg-success/70' : count === 1 ? 'bg-success/35' : 'bg-slate-100'
-                  return <div key={key} title={`${key}: ${count} accepted`} className={`h-2.5 w-2.5 shrink-0 rounded-sm ${tone}`} />
+                  return <div key={key} title={`${key}: ${count} accepted`} className={`h-2.5 w-2.5 shrink-0 rounded-sm transition-transform duration-200 hover:scale-125 ${tone}`} />
                 })}
               </div>
             )
           })}
         </div>
       </div>
-      <div className="mt-2 flex items-center justify-between text-xs text-secondary">
+      <div className="mt-2 flex items-center justify-between text-xs text-secondary md:px-4">
         <span>Last year</span>
         <span>{cells.length} active days logged</span>
       </div>
@@ -202,14 +222,14 @@ export function DashboardProfileOverview({ profile, cells, today }: { profile: D
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 border-t border-border pt-5 md:grid-cols-3">
-        <p className="text-sm text-secondary">
+      <div className="mt-5 grid gap-4 border-t border-border pt-5 md:grid-cols-3 ">
+        <p className="text-sm text-secondary  text-center">
           <span className="font-mono text-lg font-semibold text-primary">{profile.lastYearSubmissionCount}</span> submissions in the last year
         </p>
-        <p className="text-sm text-secondary">
+        <p className="text-sm text-secondary text-center">
           Total Active Days: <span className="font-mono font-semibold text-primary">{profile.activeDaysCount}</span>
         </p>
-        <p className="text-sm text-secondary">
+        <p className="text-sm text-secondary text-center">
           Max Streak: <span className="font-mono font-semibold text-primary">{profile.longestStreak}</span>
         </p>
       </div>

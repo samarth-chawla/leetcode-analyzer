@@ -12,7 +12,7 @@ export default async function MentorPage() {
 
   return (
     <AppShell active="/mentor">
-      <h1 className="text-[32px] font-bold text-primary">AI Mentor</h1>
+      <h1 className="text-2xl md:text-[32px] font-bold text-primary">AI Mentor</h1>
       <p className="mt-2 text-sm text-secondary">Ask questions grounded in your actual LeetCode performance.</p>
       <div className="mt-6">
         <MentorChat initial={messages.map(({ role, content }) => ({ role, content }))} />

@@ -4,6 +4,9 @@ import { ButtonLink } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/logo";
 import { clerkEnabled } from "@/lib/auth/clerk-enabled";
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import { InteractivePlanPreview } from "@/components/interactive-plan-preview";
 
 const features = [
   {
@@ -31,6 +34,11 @@ const steps = [
 ];
 
 export default function LandingPage() {
+  const { userId } = auth();
+  if (userId) {
+    redirect("/dashboard");
+  }
+
   const hasClerk = clerkEnabled();
 
   return (
@@ -96,47 +104,11 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-border bg-white p-4 shadow-card">
-            <div className="rounded-lg border border-border bg-surface p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-secondary">
-                    Today&apos;s Practice Plan
-                  </p>
-                  <h2 className="text-lg font-semibold text-primary">
-                    June 5, 2026
-                  </h2>
-                </div>
-                <Badge tone="success">8 day streak</Badge>
-              </div>
-              {[
-                "Climbing Stairs",
-                "Number of Islands",
-                "Binary Tree Paths",
-              ].map((name, index) => (
-                <div
-                  key={name}
-                  className="mt-4 flex items-center justify-between rounded-lg border border-border bg-white p-4"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-primary">
-                      {index + 1}. {name}
-                    </p>
-                    <p className="text-xs text-secondary">
-                      {
-                        [
-                          "Dynamic Programming · Easy",
-                          "Graphs · Medium",
-                          "Trees · Medium",
-                        ][index]
-                      }
-                    </p>
-                  </div>
-                  <span className="rounded-lg bg-brand px-3 py-2 text-xs font-medium text-white">
-                    Start
-                  </span>
-                </div>
-              ))}
+          <div className="relative w-full max-w-[520px] mx-auto">
+            {/* Elegant gradient glowing blur blob to add depth */}
+            <div className="absolute -inset-2 rounded-2xl bg-gradient-to-tr from-brand/20 to-success/20 blur-xl opacity-75 animate-pulse" />
+            <div className="relative">
+              <InteractivePlanPreview />
             </div>
           </div>
         </section>
@@ -193,8 +165,13 @@ export default function LandingPage() {
           <div className="mx-auto max-w-5xl px-4">
             <div className="grid overflow-hidden rounded-xl border border-border bg-white shadow-card md:grid-cols-2">
               <ImportColumn
+                title="Username Import"
+                good={["No install needed", "Instant analysis", "Profile dashboard sync"]}
+                bad={[]}
+              />
+              <ImportColumn
                 title="Extension Import"
-                recommended
+                badge="Launching Soon"
                 good={[
                   "Complete history",
                   "Attempt-level analytics",
@@ -202,11 +179,6 @@ export default function LandingPage() {
                   "Better accuracy",
                 ]}
                 bad={[]}
-              />
-              <ImportColumn
-                title="Username Import"
-                good={["No install needed"]}
-                bad={["Limited history", "Slower processing"]}
               />
             </div>
           </div>
@@ -249,16 +221,41 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-border py-8">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 text-sm text-secondary md:flex-row md:items-center md:justify-between">
-          <Logo />
-          <p>
-            Stop solving random LeetCode problems. Start solving the right ones.
-          </p>
-          <div className="flex gap-4">
-            <a href="#">Privacy Policy</a>
-            <a href="#">Terms</a>
-            <a href="#">GitHub</a>
+      <footer className="border-t border-border bg-surface/50 py-12">
+        <div className="mx-auto max-w-6xl px-4 text-sm text-secondary">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-2">
+              <Logo />
+              <p className="max-w-md text-xs text-secondary leading-relaxed">
+                Stop solving random LeetCode problems. Start solving the right ones based on attempt-level weakness detection.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-x-6 gap-y-2 font-medium">
+              <a href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</a>
+              <a href="/terms" className="hover:text-primary transition-colors">Terms of Service</a>
+              <a
+                href="https://github.com/samarth-chawla/leetcode-analyzer"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-primary transition-colors"
+              >
+                GitHub
+              </a>
+            </div>
+          </div>
+          <div className="mt-8 border-t border-border pt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-xs">
+            <p>© {new Date().getFullYear()} LeetCode Analyzer. All rights reserved.</p>
+            <p className="flex items-center gap-1">
+              Made with ❤️ by{' '}
+              <a
+                href="https://github.com/samarth-chawla"
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-primary hover:underline"
+              >
+                Samarth
+              </a>
+            </p>
           </div>
         </div>
       </footer>
@@ -268,12 +265,12 @@ export default function LandingPage() {
 
 function ImportColumn({
   title,
-  recommended,
+  badge,
   good,
   bad,
 }: {
   title: string;
-  recommended?: boolean;
+  badge?: string;
   good: string[];
   bad: string[];
 }) {
@@ -281,7 +278,7 @@ function ImportColumn({
     <div className="border-border p-6 first:border-b md:first:border-b-0 md:first:border-r">
       <div className="flex items-center gap-2">
         <h3 className="text-lg font-semibold text-primary">{title}</h3>
-        {recommended ? <Badge>Recommended</Badge> : null}
+        {badge ? <Badge>{badge}</Badge> : null}
       </div>
       <div className="mt-4 space-y-3 text-sm">
         {good.map((item) => (

@@ -258,7 +258,7 @@ function buildPrompt(question: string, profileContext: string, webContext: WebSe
   ].join('\n\n')
 }
 
-async function askGemini(prompt: string) {
+async function askGemini(prompt: string, onChunk: (chunk: string) => void) {
   if (!process.env.GEMINI_API_KEY) {
     console.warn('AI mentor skipped Gemini: GEMINI_API_KEY is missing.')
     return null
@@ -272,11 +272,19 @@ async function askGemini(prompt: string) {
       maxOutputTokens: 900
     }
   })
-  const result = await model.generateContent(prompt)
-  return result.response.text()
+  const result = await model.generateContentStream(prompt)
+  let text = ''
+  for await (const chunk of result.stream) {
+    const chunkText = chunk.text()
+    if (chunkText) {
+      text += chunkText
+      onChunk(chunkText)
+    }
+  }
+  return text
 }
 
-async function askNvidia(prompt: string) {
+async function askNvidia(prompt: string, onChunk: (chunk: string) => void) {
   if (!process.env.NVIDIA_API_KEY) {
     console.warn('AI mentor skipped NVIDIA: NVIDIA_API_KEY is missing.')
     return null
@@ -292,6 +300,7 @@ async function askNvidia(prompt: string) {
       model: NVIDIA_MODEL,
       temperature: 0.45,
       max_tokens: 900,
+      stream: true,
       messages: [
         {
           role: 'system',
@@ -310,19 +319,74 @@ async function askNvidia(prompt: string) {
     throw new Error(`NVIDIA mentor request failed with ${response.status}: ${text}`)
   }
 
-  const payload = await response.json()
-  return compactText(payload.choices?.[0]?.message?.content)
-}
+  if (!response.body) return ''
 
-async function askModel(prompt: string) {
-  if (MENTOR_PROVIDER === 'nvidia') {
-    return askNvidia(prompt)
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let fullText = ''
+  let buffer = ''
+
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      if (trimmed === 'data: [DONE]') continue
+      if (trimmed.startsWith('data: ')) {
+        try {
+          const jsonStr = trimmed.slice(6)
+          const parsed = JSON.parse(jsonStr)
+          const content = parsed.choices?.[0]?.delta?.content ?? ''
+          if (content) {
+            fullText += content
+            onChunk(content)
+          }
+        } catch (e) {
+          // ignore parsing error
+        }
+      }
+    }
   }
 
-  return askGemini(prompt)
+  const remaining = decoder.decode()
+  if (remaining) {
+    buffer += remaining
+  }
+  if (buffer) {
+    const trimmed = buffer.trim()
+    if (trimmed && trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
+      try {
+        const jsonStr = trimmed.slice(6)
+        const parsed = JSON.parse(jsonStr)
+        const content = parsed.choices?.[0]?.delta?.content ?? ''
+        if (content) {
+          fullText += content
+          onChunk(content)
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
+  return fullText
 }
 
-export async function askMentor(userId: string, question: string) {
+async function askModel(prompt: string, onChunk: (chunk: string) => void) {
+  if (MENTOR_PROVIDER === 'nvidia') {
+    return askNvidia(prompt, onChunk)
+  }
+
+  return askGemini(prompt, onChunk)
+}
+
+export async function askMentor(userId: string, question: string, onChunk: (chunk: string) => void) {
   const [topics, plan, stats, profile, recentProblems, webContext] = await Promise.all([
     prisma.topicScore.findMany({ where: { userId }, orderBy: { weaknessScore: 'desc' }, take: 8 }),
     prisma.dailyPlan.findFirst({ where: { userId }, orderBy: { date: 'desc' }, include: { problems: true } }),
@@ -376,14 +440,18 @@ export async function askMentor(userId: string, question: string) {
   const fallback = () => fallbackAnswer(question, topics, plan, webContext, recentProblems)
 
   try {
-    const answer = await askModel(buildPrompt(question, context, webContext))
+    const answer = await askModel(buildPrompt(question, context, webContext), onChunk)
     if (!answer?.trim()) {
       console.warn(`AI mentor used fallback: provider ${MENTOR_PROVIDER} returned no answer.`)
-      return fallback()
+      const fb = fallback()
+      onChunk(fb)
+      return fb
     }
     return answer.trim()
   } catch (error) {
     console.warn('AI mentor failed; using profile fallback.', error)
-    return fallback()
+    const fb = fallback()
+    onChunk(fb)
+    return fb
   }
 }
