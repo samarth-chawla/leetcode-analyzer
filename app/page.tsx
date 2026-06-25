@@ -99,9 +99,6 @@ export default function LandingPage() {
                 See How It Works
               </ButtonLink>
             </div>
-            <p className="mt-5 text-sm text-secondary">
-              Trusted by 2,400+ developers preparing for interviews
-            </p>
           </div>
 
           <div className="relative w-full max-w-[520px] mx-auto">
